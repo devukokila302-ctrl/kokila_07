@@ -43,33 +43,66 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
-// API Routes
+// API Routes (Mounted with and without /api prefix for Vercel Serverless compatibility)
 app.use('/api/categories', categoriesRouter);
+app.use('/categories', categoriesRouter);
+
 app.use('/api/providers', providersRouter);
+app.use('/providers', providersRouter);
+
 app.use('/api/bookings', bookingsRouter);
+app.use('/bookings', bookingsRouter);
+
 app.use('/api/reviews', reviewsRouter);
+app.use('/reviews', reviewsRouter);
+
 app.use('/api/favorites', favoritesRouter);
+app.use('/favorites', favoritesRouter);
+
 app.use('/api/ai', aiRouter);
+app.use('/ai', aiRouter);
+
+// Additional health route
+app.get('/health', (_req, res) => {
+  res.json({
+    status: 'online',
+    service: 'ServiceNear API',
+    supabaseUrl: process.env.SUPABASE_URL ? 'Configured' : 'Missing',
+    geminiApiKey: process.env.GEMINI_API_KEY ? 'Configured' : 'Missing',
+    timestamp: new Date().toISOString()
+  });
+});
 
 // Serve static build from client/dist if present (Production & Replit Unified Serving)
 const clientDist = path.resolve(__dirname, '../../client/dist');
 if (fs.existsSync(clientDist)) {
   app.use(express.static(clientDist));
   app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/api')) return next();
+    if (req.path.startsWith('/api') || req.path.startsWith('/health')) return next();
     res.sendFile(path.join(clientDist, 'index.html'));
   });
 }
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`===============================================`);
-  console.log(` ServiceNear Backend Server Running on port ${PORT}`);
-  console.log(` API Health: http://localhost:${PORT}/api/health`);
-  console.log(` Supabase: ${process.env.SUPABASE_URL || 'Default'}`);
-  console.log(` Gemini AI: ${process.env.GEMINI_API_KEY ? 'Ready' : 'Not configured'}`);
-  if (fs.existsSync(clientDist)) {
-    console.log(` Client UI Served: http://localhost:${PORT}/`);
-  }
-  console.log(`===============================================`);
-});
+// Start standalone HTTP server only when run directly as main script and not inside serverless environment (e.g. Vercel)
+const isDirectRun = !process.env.VERCEL && typeof process.argv[1] === 'string' && (
+  fileURLToPath(import.meta.url) === path.resolve(process.argv[1]) ||
+  process.argv[1].endsWith('index.ts') ||
+  (process.argv[1].endsWith('index.js') && !process.argv[1].includes('api'))
+);
+
+if (isDirectRun) {
+  app.listen(PORT, () => {
+    console.log(`===============================================`);
+    console.log(` ServiceNear Backend Server Running on port ${PORT}`);
+    console.log(` API Health: http://localhost:${PORT}/api/health`);
+    console.log(` Supabase: ${process.env.SUPABASE_URL || 'Default'}`);
+    console.log(` Gemini AI: ${process.env.GEMINI_API_KEY ? 'Ready' : 'Not configured'}`);
+    if (fs.existsSync(clientDist)) {
+      console.log(` Client UI Served: http://localhost:${PORT}/`);
+    }
+    console.log(`===============================================`);
+  });
+}
+
+export default app;
+export { app };
